@@ -104,6 +104,7 @@ import { useTheme } from "../hooks/useTheme";
 import { useTurnDiffSummaries } from "../hooks/useTurnDiffSummaries";
 import { BranchToolbar } from "./BranchToolbar";
 import { resolveShortcutCommand, shortcutLabelForCommand } from "../keybindings";
+import { ChatOutlinePanel } from "./chat/ChatOutlinePanel";
 import PlanSidebar from "./PlanSidebar";
 import ThreadTerminalDrawer from "./ThreadTerminalDrawer";
 import {
@@ -4350,7 +4351,7 @@ export default function ChatView(props: ChatViewProps) {
       {/* Main content area with optional plan sidebar */}
       <div className="flex min-h-0 min-w-0 flex-1">
         {/* Chat column */}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
           {/* Messages Wrapper */}
           <div className="relative flex min-h-0 flex-1 flex-col">
             {/* Messages */}
@@ -4394,6 +4395,12 @@ export default function ChatView(props: ChatViewProps) {
                 workspaceRoot={activeWorkspaceRoot}
               />
             </div>
+
+            {/* Chat outline strip — aligned to right edge of message content */}
+            <ChatOutlinePanel
+              timelineEntries={timelineEntries}
+              scrollContainer={messagesScrollElement}
+            />
 
             {/* scroll to bottom pill — shown when user has scrolled away from the bottom */}
             {showScrollToBottom && (
