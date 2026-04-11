@@ -103,6 +103,7 @@ interface MessagesTimelineProps {
       end: number;
     }>;
   }) => void;
+  onScrollToMessageRef?: React.MutableRefObject<((messageId: string) => void) | null>;
 }
 
 export const MessagesTimeline = memo(function MessagesTimeline({
@@ -132,6 +133,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   timestampFormat,
   workspaceRoot,
   onVirtualizerSnapshot,
+  onScrollToMessageRef,
 }: MessagesTimelineProps) {
   const timelineRootRef = useRef<HTMLDivElement | null>(null);
   const [timelineWidthPx, setTimelineWidthPx] = useState<number | null>(null);
@@ -259,6 +261,32 @@ export const MessagesTimeline = memo(function MessagesTimeline({
       rowVirtualizer.shouldAdjustScrollPositionOnItemSizeChange = undefined;
     };
   }, [rowVirtualizer]);
+
+  // Pre-computed message-id → row-index map for O(1) lookups
+  const messageIndexMap = useMemo(() => {
+    const map = new Map<string, number>();
+    rows.forEach((row, index) => {
+      if (row.kind === "message") {
+        map.set(row.message.id, index);
+      }
+    });
+    return map;
+  }, [rows]);
+
+  // Expose scroll-to-message for ChatOutlinePanel
+  useEffect(() => {
+    if (!onScrollToMessageRef) return;
+    onScrollToMessageRef.current = (messageId: string) => {
+      const index = messageIndexMap.get(messageId);
+      if (index !== undefined) {
+        rowVirtualizer.scrollToIndex(index, { align: "center", behavior: "smooth" });
+      }
+    };
+    return () => {
+      onScrollToMessageRef.current = null;
+    };
+  }, [onScrollToMessageRef, messageIndexMap, rowVirtualizer]);
+
   const pendingMeasureFrameRef = useRef<number | null>(null);
   const onTimelineImageLoad = useCallback(() => {
     if (pendingMeasureFrameRef.current !== null) return;

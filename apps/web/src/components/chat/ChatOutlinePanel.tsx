@@ -18,11 +18,13 @@ interface OutlineEntry {
 interface ChatOutlinePanelProps {
   readonly timelineEntries: ReadonlyArray<TimelineEntry>;
   readonly scrollContainer: HTMLDivElement | null;
+  readonly onScrollToMessage: React.MutableRefObject<((messageId: string) => void) | null>;
 }
 
 export const ChatOutlinePanel = memo(function ChatOutlinePanel({
   timelineEntries,
   scrollContainer,
+  onScrollToMessage,
 }: ChatOutlinePanelProps) {
   const outlineEntries = useMemo(
     () =>
@@ -119,13 +121,18 @@ export const ChatOutlinePanel = memo(function ChatOutlinePanel({
     };
   }, [scrollContainer]);
 
-  // Scroll to message — works for elements currently in DOM.
-  // Off-screen virtualized messages won't have a DOM element yet.
+  // Scroll to message via virtualizer (works for all messages, including off-screen)
   const handleClick = useCallback(
     (e: React.MouseEvent<HTMLButtonElement>) => {
-      if (!scrollContainer) return;
       const messageId = e.currentTarget.dataset.outlineId;
       if (!messageId) return;
+      // Use virtualizer scrollToIndex — handles off-screen virtualized rows
+      if (onScrollToMessage.current) {
+        onScrollToMessage.current(messageId);
+        return;
+      }
+      // Fallback: querySelector for elements currently in DOM
+      if (!scrollContainer) return;
       const el = scrollContainer.querySelector(
         `[data-message-id="${CSS.escape(messageId)}"]`,
       );
@@ -133,7 +140,7 @@ export const ChatOutlinePanel = memo(function ChatOutlinePanel({
         el.scrollIntoView({ behavior: "smooth", block: "center" });
       }
     },
-    [scrollContainer],
+    [onScrollToMessage, scrollContainer],
   );
 
   // Hover state — shows expanded popover

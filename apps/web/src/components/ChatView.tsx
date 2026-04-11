@@ -695,6 +695,7 @@ export default function ChatView(props: ChatViewProps) {
   );
   const messagesScrollRef = useRef<HTMLDivElement>(null);
   const [messagesScrollElement, setMessagesScrollElement] = useState<HTMLDivElement | null>(null);
+  const scrollToMessageRef = useRef<((messageId: string) => void) | null>(null);
   const shouldAutoScrollRef = useRef(true);
   const lastKnownScrollTopRef = useRef(0);
   const isPointerScrollActiveRef = useRef(false);
@@ -3376,6 +3377,7 @@ export default function ChatView(props: ChatViewProps) {
                 resolvedTheme={resolvedTheme}
                 timestampFormat={timestampFormat}
                 workspaceRoot={activeWorkspaceRoot}
+                onScrollToMessageRef={scrollToMessageRef}
               />
             </div>
 
@@ -3383,6 +3385,7 @@ export default function ChatView(props: ChatViewProps) {
             <ChatOutlinePanel
               timelineEntries={timelineEntries}
               scrollContainer={messagesScrollElement}
+              onScrollToMessage={scrollToMessageRef}
             />
 
             {/* scroll to bottom pill — shown when user has scrolled away from the bottom */}
