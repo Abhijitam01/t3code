@@ -90,8 +90,16 @@ export const ChatOutlinePanel = memo(function ChatOutlinePanel({
         }
         for (const node of mutation.removedNodes) {
           if (!(node instanceof HTMLElement)) continue;
+          // Check the node itself and nested children for message IDs
           const id = node.dataset.messageId;
-          if (id) removedIds.push(id);
+          if (id) {
+            removedIds.push(id);
+          } else {
+            node.querySelectorAll("[data-message-id]").forEach((el) => {
+              const nestedId = (el as HTMLElement).dataset.messageId;
+              if (nestedId) removedIds.push(nestedId);
+            });
+          }
         }
       }
       if (removedIds.length > 0) {
@@ -162,12 +170,10 @@ export const ChatOutlinePanel = memo(function ChatOutlinePanel({
     <div
       className="pointer-events-none absolute top-0 z-30"
       style={{ left: "calc(50% + 24rem + 0.5rem)" }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
-      <div
-        className="pointer-events-auto relative flex max-h-40 w-5 flex-col items-center gap-[5px] overflow-y-auto py-4"
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-      >
+      <div className="pointer-events-auto relative flex max-h-40 w-5 flex-col items-center gap-[5px] overflow-y-auto py-4">
         {outlineEntries.map((entry) => (
           <button
             key={entry.id}
@@ -181,34 +187,34 @@ export const ChatOutlinePanel = memo(function ChatOutlinePanel({
             } hover:bg-foreground/80`}
           />
         ))}
-
-        {isHovered ? (
-          <div
-            className="pointer-events-auto absolute top-0 right-full mr-2 w-56 rounded-md border border-border bg-popover p-1.5 shadow-lg"
-            onMouseEnter={handleMouseEnter}
-            onMouseLeave={handleMouseLeave}
-          >
-            <div className="max-h-72 overflow-y-auto">
-              {outlineEntries.map((entry) => (
-                <button
-                  key={entry.id}
-                  type="button"
-                  data-outline-id={entry.id}
-                  onClick={handleClick}
-                  className={`flex w-full items-start gap-2 rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-accent/50 ${
-                    activeMessageIds.has(entry.id) ? "bg-accent/30" : ""
-                  }`}
-                >
-                  <UserIcon className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />
-                  <span className="line-clamp-2 text-muted-foreground">
-                    {entry.preview || "(empty)"}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : null}
       </div>
+
+      {isHovered ? (
+        <div
+          className="pointer-events-auto absolute top-0 right-full mr-2 w-56 rounded-md border border-border bg-popover p-1.5 shadow-lg"
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        >
+          <div className="max-h-72 overflow-y-auto">
+            {outlineEntries.map((entry) => (
+              <button
+                key={entry.id}
+                type="button"
+                data-outline-id={entry.id}
+                onClick={handleClick}
+                className={`flex w-full items-start gap-2 rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-accent/50 ${
+                  activeMessageIds.has(entry.id) ? "bg-accent/30" : ""
+                }`}
+              >
+                <UserIcon className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />
+                <span className="line-clamp-2 text-muted-foreground">
+                  {entry.preview || "(empty)"}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 });
