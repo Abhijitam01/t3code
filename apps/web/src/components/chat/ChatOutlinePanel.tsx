@@ -52,17 +52,20 @@ export const ChatOutlinePanel = memo(function ChatOutlinePanel({
     const intersectionObserver = new IntersectionObserver(
       (entries) => {
         setActiveMessageIds((prev) => {
+          let changed = false;
           const next = new Set(prev);
           for (const entry of entries) {
             const id = (entry.target as HTMLElement).dataset.messageId;
             if (!id) continue;
+            const sizeBefore = next.size;
             if (entry.isIntersecting) {
               next.add(id);
             } else {
               next.delete(id);
             }
+            if (next.size !== sizeBefore) changed = true;
           }
-          return next;
+          return changed ? next : prev;
         });
       },
       { root: scrollContainer, threshold: 0.1 },

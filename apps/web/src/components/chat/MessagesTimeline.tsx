@@ -292,7 +292,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
         return;
       }
 
-      rowVirtualizer.scrollToIndex(index, { align: "center", behavior: "smooth" });
+      rowVirtualizer.scrollToIndex(index, { align: "center" });
     };
     return () => {
       onScrollToMessageRef.current = null;
