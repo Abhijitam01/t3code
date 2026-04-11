@@ -101,15 +101,15 @@ import { WorkspacePathsLive } from "./workspace/Layers/WorkspacePaths.ts";
 import { ServerSecretStoreLive } from "./auth/Layers/ServerSecretStore.ts";
 import { ServerAuthLive } from "./auth/Layers/ServerAuth.ts";
 
-const defaultProjectId = ProjectId.makeUnsafe("project-default");
-const defaultThreadId = ThreadId.makeUnsafe("thread-default");
+const defaultProjectId = ProjectId.make("project-default");
+const defaultThreadId = ThreadId.make("thread-default");
 const defaultDesktopBootstrapToken = "test-desktop-bootstrap-token";
 const defaultModelSelection = {
   provider: "codex",
   model: "gpt-5-codex",
 } as const;
 const testEnvironmentDescriptor = {
-  environmentId: EnvironmentId.makeUnsafe("environment-test"),
+  environmentId: EnvironmentId.make("environment-test"),
   label: "Test environment",
   platform: {
     os: "darwin" as const,
@@ -331,6 +331,7 @@ const buildAppUnderTest = (options?: {
       staticDir: undefined,
       devUrl,
       noBrowser: true,
+      startupPresentation: "browser",
       desktopBootstrapToken: defaultDesktopBootstrapToken,
       autoBootstrapProjectFromCwd: false,
       logWebSocketEvents: false,
@@ -788,7 +789,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         "browser-session-cookie",
         "bearer-session-token",
       ]);
-      assert.equal(body.auth.sessionCookieName, "t3_session");
+      assert.isTrue(body.auth.sessionCookieName.startsWith("t3_session_"));
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
@@ -1306,7 +1307,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         );
 
         assert.equal(error._tag, "RpcClientError");
-        assertInclude(String(error), "401");
+        assertInclude(String(error), "SocketOpenError");
       }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
@@ -2684,7 +2685,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         updatedAt: now,
         projects: [
           {
-            id: ProjectId.makeUnsafe("project-a"),
+            id: ProjectId.make("project-a"),
             title: "Project A",
             workspaceRoot: "/tmp/project-a",
             defaultModelSelection,
@@ -2696,8 +2697,8 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         ],
         threads: [
           {
-            id: ThreadId.makeUnsafe("thread-1"),
-            projectId: ProjectId.makeUnsafe("project-a"),
+            id: ThreadId.make("thread-1"),
+            projectId: ProjectId.make("project-a"),
             title: "Thread A",
             modelSelection: defaultModelSelection,
             interactionMode: "default" as const,
@@ -2730,14 +2731,14 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
           checkpointDiffQuery: {
             getTurnDiff: () =>
               Effect.succeed({
-                threadId: ThreadId.makeUnsafe("thread-1"),
+                threadId: ThreadId.make("thread-1"),
                 fromTurnCount: 0,
                 toTurnCount: 1,
                 diff: "turn-diff",
               }),
             getFullThreadDiff: () =>
               Effect.succeed({
-                threadId: ThreadId.makeUnsafe("thread-1"),
+                threadId: ThreadId.make("thread-1"),
                 fromTurnCount: 0,
                 toTurnCount: 1,
                 diff: "full-diff",
@@ -2756,8 +2757,8 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         withWsRpcClient(wsUrl, (client) =>
           client[ORCHESTRATION_WS_METHODS.dispatchCommand]({
             type: "thread.session.stop",
-            commandId: CommandId.makeUnsafe("cmd-1"),
-            threadId: ThreadId.makeUnsafe("thread-1"),
+            commandId: CommandId.make("cmd-1"),
+            threadId: ThreadId.make("thread-1"),
             createdAt: now,
           }),
         ),
@@ -2767,7 +2768,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       const turnDiffResult = yield* Effect.scoped(
         withWsRpcClient(wsUrl, (client) =>
           client[ORCHESTRATION_WS_METHODS.getTurnDiff]({
-            threadId: ThreadId.makeUnsafe("thread-1"),
+            threadId: ThreadId.make("thread-1"),
             fromTurnCount: 0,
             toTurnCount: 1,
           }),
@@ -2778,7 +2779,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       const fullDiffResult = yield* Effect.scoped(
         withWsRpcClient(wsUrl, (client) =>
           client[ORCHESTRATION_WS_METHODS.getFullThreadDiff]({
-            threadId: ThreadId.makeUnsafe("thread-1"),
+            threadId: ThreadId.make("thread-1"),
             toTurnCount: 1,
           }),
         ),
@@ -2817,7 +2818,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
             readEvents: (_fromSequenceExclusive) =>
               Stream.make({
                 sequence: 1,
-                eventId: EventId.makeUnsafe("event-1"),
+                eventId: EventId.make("event-1"),
                 aggregateKind: "project",
                 aggregateId: defaultProjectId,
                 occurredAt: "2026-04-05T00:00:00.000Z",
@@ -2865,7 +2866,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
 
   it.effect("closes thread terminals after a successful archive command", () =>
     Effect.gen(function* () {
-      const threadId = ThreadId.makeUnsafe("thread-archive");
+      const threadId = ThreadId.make("thread-archive");
       const closeInputs: Array<Parameters<TerminalManagerShape["close"]>[0]> = [];
 
       yield* buildAppUnderTest({
@@ -2887,7 +2888,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         withWsRpcClient(wsUrl, (client) =>
           client[ORCHESTRATION_WS_METHODS.dispatchCommand]({
             type: "thread.archive",
-            commandId: CommandId.makeUnsafe("cmd-thread-archive"),
+            commandId: CommandId.make("cmd-thread-archive"),
             threadId,
           }),
         ),
@@ -2947,10 +2948,10 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
           withWsRpcClient(wsUrl, (client) =>
             client[ORCHESTRATION_WS_METHODS.dispatchCommand]({
               type: "thread.turn.start",
-              commandId: CommandId.makeUnsafe("cmd-bootstrap-turn-start"),
-              threadId: ThreadId.makeUnsafe("thread-bootstrap"),
+              commandId: CommandId.make("cmd-bootstrap-turn-start"),
+              threadId: ThreadId.make("thread-bootstrap"),
               message: {
-                messageId: MessageId.makeUnsafe("msg-bootstrap"),
+                messageId: MessageId.make("msg-bootstrap"),
                 role: "user",
                 text: "hello",
                 attachments: [],
@@ -2999,7 +3000,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
           path: null,
         });
         assert.deepEqual(runForThread.mock.calls[0]?.[0], {
-          threadId: ThreadId.makeUnsafe("thread-bootstrap"),
+          threadId: ThreadId.make("thread-bootstrap"),
           projectId: defaultProjectId,
           projectCwd: "/tmp/project",
           worktreePath: "/tmp/bootstrap-worktree",
@@ -3062,10 +3063,10 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         withWsRpcClient(wsUrl, (client) =>
           client[ORCHESTRATION_WS_METHODS.dispatchCommand]({
             type: "thread.turn.start",
-            commandId: CommandId.makeUnsafe("cmd-bootstrap-turn-start-setup-failure"),
-            threadId: ThreadId.makeUnsafe("thread-bootstrap-setup-failure"),
+            commandId: CommandId.make("cmd-bootstrap-turn-start-setup-failure"),
+            threadId: ThreadId.make("thread-bootstrap-setup-failure"),
             message: {
-              messageId: MessageId.makeUnsafe("msg-bootstrap-setup-failure"),
+              messageId: MessageId.make("msg-bootstrap-setup-failure"),
               role: "user",
               text: "hello",
               attachments: [],
@@ -3178,10 +3179,10 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         withWsRpcClient(wsUrl, (client) =>
           client[ORCHESTRATION_WS_METHODS.dispatchCommand]({
             type: "thread.turn.start",
-            commandId: CommandId.makeUnsafe("cmd-bootstrap-turn-start-setup-activity-failure"),
-            threadId: ThreadId.makeUnsafe("thread-bootstrap-setup-activity-failure"),
+            commandId: CommandId.make("cmd-bootstrap-turn-start-setup-activity-failure"),
+            threadId: ThreadId.make("thread-bootstrap-setup-activity-failure"),
             message: {
-              messageId: MessageId.makeUnsafe("msg-bootstrap-setup-activity-failure"),
+              messageId: MessageId.make("msg-bootstrap-setup-activity-failure"),
               role: "user",
               text: "hello",
               attachments: [],
@@ -3261,10 +3262,10 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         withWsRpcClient(wsUrl, (client) =>
           client[ORCHESTRATION_WS_METHODS.dispatchCommand]({
             type: "thread.turn.start",
-            commandId: CommandId.makeUnsafe("cmd-bootstrap-turn-start-defect"),
-            threadId: ThreadId.makeUnsafe("thread-bootstrap-defect"),
+            commandId: CommandId.make("cmd-bootstrap-turn-start-defect"),
+            threadId: ThreadId.make("thread-bootstrap-defect"),
             message: {
-              messageId: MessageId.makeUnsafe("msg-bootstrap-defect"),
+              messageId: MessageId.make("msg-bootstrap-defect"),
               role: "user",
               text: "hello",
               attachments: [],
@@ -3310,7 +3311,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     () =>
       Effect.gen(function* () {
         const now = new Date().toISOString();
-        const threadId = ThreadId.makeUnsafe("thread-1");
+        const threadId = ThreadId.make("thread-1");
         let replayCursor: number | null = null;
         const makeEvent = (sequence: number): OrchestrationEvent =>
           ({
@@ -3392,7 +3393,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
             readEvents: () =>
               Stream.make({
                 sequence: 1,
-                eventId: EventId.makeUnsafe("event-1"),
+                eventId: EventId.make("event-1"),
                 aggregateKind: "project",
                 aggregateId: defaultProjectId,
                 occurredAt: "2026-04-06T00:00:00.000Z",
@@ -3463,7 +3464,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
               }),
             streamDomainEvents: Stream.make({
               sequence: 1,
-              eventId: EventId.makeUnsafe("event-1"),
+              eventId: EventId.make("event-1"),
               aggregateKind: "project",
               aggregateId: defaultProjectId,
               occurredAt: "2026-04-05T00:00:00.000Z",

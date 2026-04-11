@@ -91,7 +91,9 @@ export function BranchToolbarBranchSelector({
   const serverThread = useStore(serverThreadSelector);
   const serverSession = serverThread?.session ?? null;
   const setThreadBranchAction = useStore((store) => store.setThreadBranch);
-  const draftThread = useComposerDraftStore((store) => store.getDraftThreadByRef(threadRef));
+  const draftThread = useComposerDraftStore((store) =>
+    draftId ? store.getDraftSession(draftId) : store.getDraftThreadByRef(threadRef),
+  );
   const setDraftThreadContext = useComposerDraftStore((store) => store.setDraftThreadContext);
 
   const activeProjectRef = serverThread
@@ -144,7 +146,7 @@ export function BranchToolbarBranchSelector({
         });
       }
       if (hasServerThread) {
-        setThreadBranchAction(activeThreadId, branch, worktreePath);
+        setThreadBranchAction(threadRef, branch, worktreePath);
         return;
       }
       const nextDraftEnvMode = resolveDraftEnvModeAfterBranchChange({

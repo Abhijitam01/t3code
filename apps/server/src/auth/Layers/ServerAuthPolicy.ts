@@ -3,24 +3,8 @@ import { Effect, Layer } from "effect";
 
 import { ServerConfig } from "../../config.ts";
 import { ServerAuthPolicy, type ServerAuthPolicyShape } from "../Services/ServerAuthPolicy.ts";
-import { SESSION_COOKIE_NAME } from "../utils.ts";
-
-const isWildcardHost = (host: string | undefined): boolean =>
-  host === "0.0.0.0" || host === "::" || host === "[::]";
-
-const isLoopbackHost = (host: string | undefined): boolean => {
-  if (!host || host.length === 0) {
-    return true;
-  }
-
-  return (
-    host === "localhost" ||
-    host === "127.0.0.1" ||
-    host === "::1" ||
-    host === "[::1]" ||
-    host.startsWith("127.")
-  );
-};
+import { resolveSessionCookieName } from "../utils.ts";
+import { isLoopbackHost, isWildcardHost } from "../../startupAccess.ts";
 
 export const makeServerAuthPolicy = Effect.gen(function* () {
   const config = yield* ServerConfig;
@@ -46,7 +30,10 @@ export const makeServerAuthPolicy = Effect.gen(function* () {
     policy,
     bootstrapMethods,
     sessionMethods: ["browser-session-cookie", "bearer-session-token"],
-    sessionCookieName: SESSION_COOKIE_NAME,
+    sessionCookieName: resolveSessionCookieName({
+      mode: config.mode,
+      port: config.port,
+    }),
   };
 
   return {

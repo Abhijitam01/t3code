@@ -2,10 +2,10 @@ import { AuthSessionId, type AuthClientMetadata, type AuthClientSession } from "
 import { Clock, DateTime, Duration, Effect, Layer, PubSub, Ref, Schema, Stream } from "effect";
 import { Option } from "effect";
 
+import { ServerConfig } from "../../config.ts";
 import { AuthSessionRepositoryLive } from "../../persistence/Layers/AuthSessions.ts";
 import { AuthSessionRepository } from "../../persistence/Services/AuthSessions.ts";
 import { ServerSecretStore } from "../Services/ServerSecretStore.ts";
-import { SESSION_COOKIE_NAME } from "../utils.ts";
 import {
   SessionCredentialError,
   SessionCredentialService,
@@ -17,6 +17,7 @@ import {
 import {
   base64UrlDecodeUtf8,
   base64UrlEncode,
+  resolveSessionCookieName,
   signPayload,
   timingSafeEqualBase64Url,
 } from "../utils.ts";
@@ -45,6 +46,9 @@ const WebSocketClaims = Schema.Struct({
   exp: Schema.Number,
 });
 type WebSocketClaims = typeof WebSocketClaims.Type;
+
+const decodeSessionClaims = Schema.decodeUnknownEffect(Schema.fromJsonString(SessionClaims));
+const decodeWebSocketClaims = Schema.decodeUnknownEffect(Schema.fromJsonString(WebSocketClaims));
 
 function createDefaultClientMetadata(): AuthClientMetadata {
   return {
@@ -78,11 +82,16 @@ function toAuthClientSession(input: Omit<AuthClientSession, "current">): AuthCli
 }
 
 export const makeSessionCredentialService = Effect.gen(function* () {
+  const serverConfig = yield* ServerConfig;
   const secretStore = yield* ServerSecretStore;
   const authSessions = yield* AuthSessionRepository;
   const signingSecret = yield* secretStore.getOrCreateRandom(SIGNING_SECRET_NAME, 32);
   const connectedSessionsRef = yield* Ref.make(new Map<string, number>());
   const changesPubSub = yield* PubSub.unbounded<SessionCredentialChange>();
+  const cookieName = resolveSessionCookieName({
+    mode: serverConfig.mode,
+    port: serverConfig.port,
+  });
 
   const toSessionCredentialError = (message: string) => (cause: unknown) =>
     new SessionCredentialError({
@@ -185,7 +194,7 @@ export const makeSessionCredentialService = Effect.gen(function* () {
 
   const issue: SessionCredentialServiceShape["issue"] = (input) =>
     Effect.gen(function* () {
-      const sessionId = AuthSessionId.makeUnsafe(crypto.randomUUID());
+      const sessionId = AuthSessionId.make(crypto.randomUUID());
       const issuedAt = yield* DateTime.now;
       const expiresAt = DateTime.add(issuedAt, {
         milliseconds: Duration.toMillis(input?.ttl ?? DEFAULT_SESSION_TTL),
@@ -259,15 +268,15 @@ export const makeSessionCredentialService = Effect.gen(function* () {
         });
       }
 
-      const claims = yield* Effect.try({
-        try: () =>
-          Schema.decodeUnknownSync(SessionClaims)(JSON.parse(base64UrlDecodeUtf8(encodedPayload))),
-        catch: (cause) =>
-          new SessionCredentialError({
-            message: "Invalid session token payload.",
-            cause,
-          }),
-      });
+      const claims = yield* decodeSessionClaims(base64UrlDecodeUtf8(encodedPayload)).pipe(
+        Effect.mapError(
+          (cause) =>
+            new SessionCredentialError({
+              message: "Invalid session token payload.",
+              cause,
+            }),
+        ),
+      );
 
       const now = yield* Clock.currentTimeMillis;
       if (claims.exp <= now) {
@@ -348,17 +357,15 @@ export const makeSessionCredentialService = Effect.gen(function* () {
         });
       }
 
-      const claims = yield* Effect.try({
-        try: () =>
-          Schema.decodeUnknownSync(WebSocketClaims)(
-            JSON.parse(base64UrlDecodeUtf8(encodedPayload)),
-          ),
-        catch: (cause) =>
-          new SessionCredentialError({
-            message: "Invalid websocket token payload.",
-            cause,
-          }),
-      });
+      const claims = yield* decodeWebSocketClaims(base64UrlDecodeUtf8(encodedPayload)).pipe(
+        Effect.mapError(
+          (cause) =>
+            new SessionCredentialError({
+              message: "Invalid websocket token payload.",
+              cause,
+            }),
+        ),
+      );
 
       const now = yield* Clock.currentTimeMillis;
       if (claims.exp <= now) {
@@ -471,7 +478,7 @@ export const makeSessionCredentialService = Effect.gen(function* () {
     }).pipe(Effect.mapError(toSessionCredentialError("Failed to revoke other sessions.")));
 
   return {
-    cookieName: SESSION_COOKIE_NAME,
+    cookieName,
     issue,
     verify,
     issueWebSocketToken,

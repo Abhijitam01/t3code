@@ -113,12 +113,15 @@ vi.mock("~/environmentApi", () => ({
 }));
 
 vi.mock("~/localApi", () => ({
+  ensureLocalApi: vi.fn(() => {
+    throw new Error("ensureLocalApi not implemented in browser test");
+  }),
   readLocalApi: readLocalApiMock,
 }));
 
 import { TerminalViewport } from "./ThreadTerminalDrawer";
 
-const THREAD_ID = ThreadId.makeUnsafe("thread-terminal-browser");
+const THREAD_ID = ThreadId.make("thread-terminal-browser");
 
 function createEnvironmentApi() {
   return {
@@ -254,6 +257,32 @@ describe("TerminalViewport", () => {
         expect(environmentB.terminal.open).toHaveBeenCalledTimes(1);
       });
       expect(terminalDisposeSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      await mounted.cleanup();
+    }
+  });
+
+  it("does not reopen the terminal when the scoped thread reference values stay the same", async () => {
+    const environment = createEnvironmentApi();
+    environmentApiById.set("environment-a", environment);
+
+    const mounted = await mountTerminalViewport({
+      threadRef: scopeThreadRef("environment-a" as never, THREAD_ID),
+    });
+
+    try {
+      await vi.waitFor(() => {
+        expect(environment.terminal.open).toHaveBeenCalledTimes(1);
+      });
+
+      await mounted.rerender({
+        threadRef: scopeThreadRef("environment-a" as never, THREAD_ID),
+      });
+
+      await vi.waitFor(() => {
+        expect(environment.terminal.open).toHaveBeenCalledTimes(1);
+      });
+      expect(terminalDisposeSpy).not.toHaveBeenCalled();
     } finally {
       await mounted.cleanup();
     }

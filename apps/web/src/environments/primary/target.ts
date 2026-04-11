@@ -6,6 +6,8 @@ export interface PrimaryEnvironmentTarget {
   readonly target: KnownEnvironment["target"];
 }
 
+const LOOPBACK_HOSTNAMES = new Set(["127.0.0.1", "::1", "localhost"]);
+
 function getDesktopLocalEnvironmentBootstrap(): DesktopEnvironmentBootstrap | null {
   return window.desktopBridge?.getLocalEnvironmentBootstrap() ?? null;
 }
@@ -14,23 +16,76 @@ function normalizeBaseUrl(rawValue: string): string {
   return new URL(rawValue, window.location.origin).toString();
 }
 
+function swapBaseUrlProtocol(
+  rawValue: string,
+  nextProtocol: "http:" | "https:" | "ws:" | "wss:",
+): string {
+  const url = new URL(normalizeBaseUrl(rawValue));
+  url.protocol = nextProtocol;
+  return url.toString();
+}
+
+function normalizeHostname(hostname: string): string {
+  return hostname
+    .trim()
+    .toLowerCase()
+    .replace(/^\[(.*)\]$/, "$1");
+}
+
+export function isLoopbackHostname(hostname: string): boolean {
+  return LOOPBACK_HOSTNAMES.has(normalizeHostname(hostname));
+}
+
+function resolveHttpRequestBaseUrl(httpBaseUrl: string): string {
+  const configuredDevServerUrl = import.meta.env.VITE_DEV_SERVER_URL?.trim();
+  if (!configuredDevServerUrl) {
+    return httpBaseUrl;
+  }
+
+  const currentUrl = new URL(window.location.href);
+  const targetUrl = new URL(httpBaseUrl);
+  const devServerUrl = new URL(configuredDevServerUrl, currentUrl.origin);
+
+  const isCurrentOriginDevServer =
+    (currentUrl.protocol === "http:" || currentUrl.protocol === "https:") &&
+    currentUrl.origin === devServerUrl.origin;
+
+  if (
+    !isCurrentOriginDevServer ||
+    currentUrl.origin === targetUrl.origin ||
+    !isLoopbackHostname(currentUrl.hostname) ||
+    !isLoopbackHostname(targetUrl.hostname)
+  ) {
+    return httpBaseUrl;
+  }
+
+  return currentUrl.origin;
+}
+
 function resolveConfiguredPrimaryTarget(): PrimaryEnvironmentTarget | null {
-  const configuredHttpBaseUrl = import.meta.env.VITE_HTTP_URL?.trim();
-  const configuredWsBaseUrl = import.meta.env.VITE_WS_URL?.trim();
+  const configuredHttpBaseUrl = import.meta.env.VITE_HTTP_URL?.trim() || undefined;
+  const configuredWsBaseUrl = import.meta.env.VITE_WS_URL?.trim() || undefined;
 
   if (!configuredHttpBaseUrl && !configuredWsBaseUrl) {
     return null;
   }
 
-  if (!configuredHttpBaseUrl || !configuredWsBaseUrl) {
-    throw new Error("Configured primary environments require both VITE_HTTP_URL and VITE_WS_URL.");
-  }
+  const resolvedHttpBaseUrl =
+    configuredHttpBaseUrl ??
+    (configuredWsBaseUrl?.startsWith("wss:")
+      ? swapBaseUrlProtocol(configuredWsBaseUrl, "https:")
+      : swapBaseUrlProtocol(configuredWsBaseUrl!, "http:"));
+  const resolvedWsBaseUrl =
+    configuredWsBaseUrl ??
+    (configuredHttpBaseUrl?.startsWith("https:")
+      ? swapBaseUrlProtocol(configuredHttpBaseUrl, "wss:")
+      : swapBaseUrlProtocol(configuredHttpBaseUrl!, "ws:"));
 
   return {
     source: "configured",
     target: {
-      httpBaseUrl: normalizeBaseUrl(configuredHttpBaseUrl),
-      wsBaseUrl: normalizeBaseUrl(configuredWsBaseUrl),
+      httpBaseUrl: normalizeBaseUrl(resolvedHttpBaseUrl),
+      wsBaseUrl: normalizeBaseUrl(resolvedWsBaseUrl),
     },
   };
 }
@@ -86,7 +141,7 @@ export function resolvePrimaryEnvironmentHttpUrl(
     throw new Error("Unable to resolve the primary environment HTTP base URL.");
   }
 
-  const url = new URL(primaryTarget.target.httpBaseUrl);
+  const url = new URL(resolveHttpRequestBaseUrl(primaryTarget.target.httpBaseUrl));
   url.pathname = pathname;
   if (searchParams) {
     url.search = new URLSearchParams(searchParams).toString();

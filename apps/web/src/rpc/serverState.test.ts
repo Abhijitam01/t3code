@@ -48,11 +48,13 @@ const defaultProviders: ReadonlyArray<ServerProvider> = [
     auth: { status: "authenticated" },
     checkedAt: "2026-01-01T00:00:00.000Z",
     models: [],
+    slashCommands: [],
+    skills: [],
   },
 ];
 
 const baseEnvironment = {
-  environmentId: EnvironmentId.makeUnsafe("environment-local"),
+  environmentId: EnvironmentId.make("environment-local"),
   label: "Local environment",
   platform: {
     os: "darwin" as const,
@@ -217,8 +219,8 @@ describe("serverState", () => {
         environment: baseEnvironment,
         cwd: "/tmp/workspace",
         projectName: "t3-code",
-        bootstrapProjectId: ProjectId.makeUnsafe("project-1"),
-        bootstrapThreadId: ThreadId.makeUnsafe("thread-1"),
+        bootstrapProjectId: ProjectId.make("project-1"),
+        bootstrapThreadId: ThreadId.make("thread-1"),
       },
     });
 
@@ -226,8 +228,8 @@ describe("serverState", () => {
       environment: baseEnvironment,
       cwd: "/tmp/workspace",
       projectName: "t3-code",
-      bootstrapProjectId: ProjectId.makeUnsafe("project-1"),
-      bootstrapThreadId: ThreadId.makeUnsafe("thread-1"),
+      bootstrapProjectId: ProjectId.make("project-1"),
+      bootstrapThreadId: ThreadId.make("thread-1"),
     });
 
     const lateListener = vi.fn();
@@ -236,8 +238,8 @@ describe("serverState", () => {
       environment: baseEnvironment,
       cwd: "/tmp/workspace",
       projectName: "t3-code",
-      bootstrapProjectId: ProjectId.makeUnsafe("project-1"),
-      bootstrapThreadId: ThreadId.makeUnsafe("thread-1"),
+      bootstrapProjectId: ProjectId.make("project-1"),
+      bootstrapThreadId: ThreadId.make("thread-1"),
     });
 
     unsubscribeLate();
