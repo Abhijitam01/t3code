@@ -278,14 +278,26 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     if (!onScrollToMessageRef) return;
     onScrollToMessageRef.current = (messageId: string) => {
       const index = messageIndexMap.get(messageId);
-      if (index !== undefined) {
-        rowVirtualizer.scrollToIndex(index, { align: "center", behavior: "smooth" });
+      if (index === undefined) return;
+
+      // Tail rows (index >= virtualizedRowCount) are always in the DOM but not
+      // tracked by the virtualizer — use scrollIntoView for those.
+      if (index >= virtualizedRowCount) {
+        const el = scrollContainer?.querySelector(
+          `[data-message-id="${CSS.escape(messageId)}"]`,
+        );
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        return;
       }
+
+      rowVirtualizer.scrollToIndex(index, { align: "center", behavior: "smooth" });
     };
     return () => {
       onScrollToMessageRef.current = null;
     };
-  }, [onScrollToMessageRef, messageIndexMap, rowVirtualizer]);
+  }, [onScrollToMessageRef, messageIndexMap, rowVirtualizer, virtualizedRowCount, scrollContainer]);
 
   const pendingMeasureFrameRef = useRef<number | null>(null);
   const onTimelineImageLoad = useCallback(() => {
