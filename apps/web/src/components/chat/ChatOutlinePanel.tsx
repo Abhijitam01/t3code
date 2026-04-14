@@ -157,6 +157,9 @@ export const ChatOutlinePanel = memo(function ChatOutlinePanel({
   }, []);
 
   const handleMouseLeave = useCallback(() => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+    }
     hoverTimerRef.current = setTimeout(() => {
       setIsHovered(false);
     }, 200);

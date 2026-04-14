@@ -25,6 +25,16 @@ function swapBaseUrlProtocol(
   return url.toString();
 }
 
+function deriveWsFromHttp(httpUrl: string): string {
+  const url = new URL(httpUrl, window.location.origin);
+  if (url.protocol === "http:") {
+    url.protocol = "ws:";
+  } else if (url.protocol === "https:") {
+    url.protocol = "wss:";
+  }
+  return url.toString();
+}
+
 function normalizeHostname(hostname: string): string {
   return hostname
     .trim()
@@ -92,19 +102,11 @@ function resolveConfiguredPrimaryTarget(): PrimaryEnvironmentTarget | null {
 
 function resolveWindowOriginPrimaryTarget(): PrimaryEnvironmentTarget {
   const httpBaseUrl = normalizeBaseUrl(window.location.origin);
-  const url = new URL(httpBaseUrl);
-  if (url.protocol === "http:") {
-    url.protocol = "ws:";
-  } else if (url.protocol === "https:") {
-    url.protocol = "wss:";
-  } else {
-    throw new Error(`Unsupported HTTP base URL protocol: ${url.protocol}`);
-  }
   return {
     source: "window-origin",
     target: {
       httpBaseUrl,
-      wsBaseUrl: url.toString(),
+      wsBaseUrl: deriveWsFromHttp(httpBaseUrl),
     },
   };
 }
