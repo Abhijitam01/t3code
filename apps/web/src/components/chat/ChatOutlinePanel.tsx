@@ -10,10 +10,6 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { UserIcon } from "lucide-react";
 import type { TimelineEntry } from "../../session-logic";
 
-interface OutlineEntry {
-  readonly id: string;
-  readonly preview: string;
-}
 
 interface ChatOutlinePanelProps {
   readonly timelineEntries: ReadonlyArray<TimelineEntry>;
@@ -95,12 +91,11 @@ export const ChatOutlinePanel = memo(function ChatOutlinePanel({
         }
         for (const node of mutation.removedNodes) {
           if (!(node instanceof HTMLElement)) continue;
-          // Check the node itself and nested children for message IDs
-          const id = node.dataset.messageId;
-          if (id) {
-            removedIds.push(id);
+          // Only collect user-message IDs (matches IntersectionObserver scope)
+          if (node.dataset.messageRole === "user" && node.dataset.messageId) {
+            removedIds.push(node.dataset.messageId);
           } else {
-            node.querySelectorAll("[data-message-id]").forEach((el) => {
+            node.querySelectorAll('[data-message-role="user"][data-message-id]').forEach((el) => {
               const nestedId = (el as HTMLElement).dataset.messageId;
               if (nestedId) removedIds.push(nestedId);
             });
@@ -109,9 +104,12 @@ export const ChatOutlinePanel = memo(function ChatOutlinePanel({
       }
       if (removedIds.length > 0) {
         setActiveMessageIds((prev) => {
+          let changed = false;
           const next = new Set(prev);
-          for (const id of removedIds) next.delete(id);
-          return next;
+          for (const id of removedIds) {
+            if (next.delete(id)) changed = true;
+          }
+          return changed ? next : prev;
         });
       }
     });
