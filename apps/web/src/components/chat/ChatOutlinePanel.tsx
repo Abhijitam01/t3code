@@ -49,7 +49,7 @@ export const ChatOutlinePanel = memo(function ChatOutlinePanel({
       setScrollContainer(el instanceof HTMLElement ? el : null);
     });
     return () => cancelAnimationFrame(frameId);
-  }, [listRef]);
+  }, [listRef, timelineEntries]);
 
   // Active message tracking — MutationObserver watches for LegendList
   // mount/unmount, IntersectionObserver tracks visibility.
