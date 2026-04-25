@@ -3267,8 +3267,7 @@ export default function ChatView(props: ChatViewProps) {
             {/* Chat outline strip — aligned to right edge of message content */}
             <ChatOutlinePanel
               timelineEntries={timelineEntries}
-              scrollContainer={null}
-              onScrollToMessage={{ current: null }}
+              listRef={legendListRef}
             />
 
             {/* scroll to bottom pill — shown when user has scrolled away from the bottom */}

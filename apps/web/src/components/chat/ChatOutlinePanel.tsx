@@ -3,24 +3,23 @@
  * Shows a small bar per user message; hover to expand a popover with previews.
  * Click any bar or preview to scroll to that message.
  *
- * Uses MutationObserver + IntersectionObserver to handle @tanstack/react-virtual
- * row mount/unmount — elements are tracked as the virtualizer creates them.
+ * Uses MutationObserver + IntersectionObserver to track which user messages
+ * are currently visible in the LegendList scroll container.
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { UserIcon } from "lucide-react";
+import type { LegendListRef } from "@legendapp/list/react";
 import type { TimelineEntry } from "../../session-logic";
 
 
 interface ChatOutlinePanelProps {
   readonly timelineEntries: ReadonlyArray<TimelineEntry>;
-  readonly scrollContainer: HTMLDivElement | null;
-  readonly onScrollToMessage: React.MutableRefObject<((messageId: string) => void) | null>;
+  readonly listRef: React.RefObject<LegendListRef | null>;
 }
 
 export const ChatOutlinePanel = memo(function ChatOutlinePanel({
   timelineEntries,
-  scrollContainer,
-  onScrollToMessage,
+  listRef,
 }: ChatOutlinePanelProps) {
   const outlineEntries = useMemo(
     () =>
@@ -36,7 +35,23 @@ export const ChatOutlinePanel = memo(function ChatOutlinePanel({
     [timelineEntries],
   );
 
-  // Active message tracking — MutationObserver watches for virtualizer
+  // Derive the scroll container element from LegendList's ref.
+  // We retry on the next frame because the ref may not be populated on first render.
+  const [scrollContainer, setScrollContainer] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    const node = listRef.current?.getScrollableNode() ?? null;
+    if (node instanceof HTMLElement) {
+      setScrollContainer(node);
+      return;
+    }
+    const frameId = requestAnimationFrame(() => {
+      const el = listRef.current?.getScrollableNode() ?? null;
+      setScrollContainer(el instanceof HTMLElement ? el : null);
+    });
+    return () => cancelAnimationFrame(frameId);
+  }, [listRef]);
+
+  // Active message tracking — MutationObserver watches for LegendList
   // mount/unmount, IntersectionObserver tracks visibility.
   const [activeMessageIds, setActiveMessageIds] = useState<ReadonlySet<string>>(
     () => new Set<string>(),
@@ -122,18 +137,11 @@ export const ChatOutlinePanel = memo(function ChatOutlinePanel({
     };
   }, [scrollContainer]);
 
-  // Scroll to message via virtualizer (works for all messages, including off-screen)
+  // Scroll to message — finds the element in the LegendList scroll container
   const handleClick = useCallback(
     (e: React.MouseEvent<HTMLButtonElement>) => {
       const messageId = e.currentTarget.dataset.outlineId;
-      if (!messageId) return;
-      // Use virtualizer scrollToIndex — handles off-screen virtualized rows
-      if (onScrollToMessage.current) {
-        onScrollToMessage.current(messageId);
-        return;
-      }
-      // Fallback: querySelector for elements currently in DOM
-      if (!scrollContainer) return;
+      if (!messageId || !scrollContainer) return;
       const el = scrollContainer.querySelector(
         `[data-message-id="${CSS.escape(messageId)}"]`,
       );
@@ -141,7 +149,7 @@ export const ChatOutlinePanel = memo(function ChatOutlinePanel({
         el.scrollIntoView({ behavior: "smooth", block: "center" });
       }
     },
-    [onScrollToMessage, scrollContainer],
+    [scrollContainer],
   );
 
   // Hover state — shows expanded popover
